@@ -1,3 +1,28 @@
+"""
+SesMind - AI-Powered Mental Wellness Companion
+==============================================
+Ruh sağlığı desteği sağlayan yapay zeka destekli chatbot uygulaması.
+
+Genel İşleyiş:
+- Kullanıcı 8 soruluk stres taramasını tamamlar (0-32 puan arası)
+- Stres seviyesine göre kategorize edilir (düşük/hafif/orta/belirgin)
+- Qwen3:4b LLM modeli ile kişiselleştirilmiş destek sağlanır
+- Kullanıcı mesajlarına stres skoru bağlamı eklenerek yanıt verilir
+
+Kullanılan Teknolojiler:
+- LangChain: LLM orkestrasyon framework'ü
+- Ollama: Yerel LLM çalıştırma (Qwen3:4b modeli)
+- Chainlit: Conversational AI için UI framework'ü
+- Python 3.x: Ana programlama dili
+
+Geliştirici: Nezahat Korkmaz
+GitHub: github.com/nezahatkorkmaz
+Lisans: MIT
+"""
+
+"""SesMind mental destek sohbet uygulamasının Chainlit giriş noktası."""
+
+import os
 from typing import Dict, List, Optional, Sequence, Union
 
 from langchain_community.llms import Ollama
@@ -7,6 +32,11 @@ from langchain_core.runnables import Runnable
 from langchain_core.runnables.config import RunnableConfig
 
 import chainlit as cl
+
+FILES_DIR = ".files"
+os.makedirs(FILES_DIR, exist_ok=True)
+
+MODEL_BASE_URL = "http://localhost:11434"
 
 
 QUESTIONS: List[str] = [
@@ -96,20 +126,27 @@ async def ask_question(index: int) -> str:
 
 @cl.on_chat_start
 async def on_chat_start():
-    elements = [
-        cl.Image(name="image1", display="inline", path="logo.png")
-    ]
     await cl.Message(
         content=(
             "Merhaba, ben SesMind. Öncelikle kısa bir stres taraması yaparak "
             "seni daha iyi anlamak istiyorum. Sorular çoktan seçmeli olacak ve "
             "yanıtların bize rehberlik edecek."
-        ),
-        elements=elements,
+        )
     ).send()
 
-    # ============ OPTİMİZE EDİLMİŞ PROMPT ============
-    model = Ollama(model="qwen3:4b")
+    try:
+        model = Ollama(model="qwen3:4b", base_url=MODEL_BASE_URL)
+        await model.ainvoke("SesMind bağlantı testi")
+    except Exception as exc:
+        await cl.Message(
+            content=(
+                "⚠️ Model bağlantısı kurulamadı. Lütfen `ollama serve` komutunun ve "
+                "`qwen3:4b` modelinin çalıştığından emin ol.\n\n"
+                f"Hata: {exc}"
+            )
+        ).send()
+        return
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
@@ -176,7 +213,6 @@ Sen: "Şu an yaşadığın bu düşünceler çok zor ve seni yalnız bırakmayac
             ("human", "{question}"),
         ]
     )
-    # ================================================
     
     runnable = prompt | model | StrOutputParser()
     cl.user_session.set("runnable", runnable)
@@ -241,13 +277,11 @@ async def on_message(message: cl.Message):
 
     stress_summary = cl.user_session.get("stress_summary")
     
-    # ============ OPTİMİZE EDİLMİŞ CONTEXT INJECTION ============
     context = ""
     if stress_summary:
         context = f"[Kullanıcı Bağlamı - Stres Skoru: {stress_summary['score']}/32 | Kategori: {stress_summary['category']}]\n\n"
     
     payload = context + message.content
-    # ===========================================================
 
     astream_kwargs = {"config": config} if config else {}
 

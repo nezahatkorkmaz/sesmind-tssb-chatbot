@@ -1,6 +1,7 @@
 [project]
 # List of environment variables to be provided by each user to use the app.
 user_env = []
+enable_telemetry = true
 
 # Duration (in seconds) during which the session is saved when the connection is lost
 session_timeout = 3600
@@ -28,6 +29,9 @@ unsafe_allow_html = false
 
 # Process and display mathematical expressions. This can clash with "$" characters in messages.
 latex = false
+
+# Disable prompt playground in production
+prompt_playground = false
 
 # Autoscroll new user messages at the top of the window
 user_message_autoscroll = true
@@ -86,7 +90,8 @@ reaction_on_message_received = false
 
 [UI]
 # Name of the assistant.
-name = "Assistant"
+name = "SesMind"
+default_language = "tr"
 
 # default_theme = "dark"
 

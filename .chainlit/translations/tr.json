@@ -1,0 +1,11 @@
+{
+  "components": {
+    "molecules": {
+      "newChatButton": "Yeni Sohbet",
+      "tasklist": {
+        "TaskList": "Görev Listesi"
+      }
+    }
+  }
+}
+
