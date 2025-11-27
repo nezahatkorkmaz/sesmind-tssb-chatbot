@@ -6,12 +6,12 @@ Ruh sağlığı desteği sağlayan yapay zeka destekli chatbot uygulaması.
 Genel İşleyiş:
 - Kullanıcı 8 soruluk stres taramasını tamamlar (0-32 puan arası)
 - Stres seviyesine göre kategorize edilir (düşük/hafif/orta/belirgin)
-- Qwen3:4b LLM modeli ile kişiselleştirilmiş destek sağlanır
+- Qwen3:4b-Instruct LLM modeli ile kişiselleştirilmiş destek sağlanır
 - Kullanıcı mesajlarına stres skoru bağlamı eklenerek yanıt verilir
 
 Kullanılan Teknolojiler:
 - LangChain: LLM orkestrasyon framework'ü
-- Ollama: Yerel LLM çalıştırma (Qwen3:4b modeli)
+- Ollama: Yerel LLM çalıştırma (Qwen3:4b-Instruct modeli)
 - Chainlit: Conversational AI için UI framework'ü
 - Python 3.x: Ana programlama dili
 
@@ -37,6 +37,7 @@ FILES_DIR = ".files"
 os.makedirs(FILES_DIR, exist_ok=True)
 
 MODEL_BASE_URL = "http://localhost:11434"
+DEFAULT_MODEL_NAME = "qwen3:4b-instruct"
 
 
 QUESTIONS: List[str] = [
@@ -135,13 +136,13 @@ async def on_chat_start():
     ).send()
 
     try:
-        model = Ollama(model="qwen3:4b", base_url=MODEL_BASE_URL)
-        await model.ainvoke("SesMind bağlantı testi")
+        model = Ollama(model=DEFAULT_MODEL_NAME, base_url=MODEL_BASE_URL)
+        await model.ainvoke("ping")
     except Exception as exc:
         await cl.Message(
             content=(
                 "⚠️ Model bağlantısı kurulamadı. Lütfen `ollama serve` komutunun ve "
-                "`qwen3:4b` modelinin çalıştığından emin ol.\n\n"
+                "`qwen3:4b-instruct` modelinin çalıştığından emin ol.\n\n"
                 f"Hata: {exc}"
             )
         ).send()
@@ -151,64 +152,18 @@ async def on_chat_start():
         [
             (
                 "system",
-                """
-### ROLE & IDENTITY
-You are **SesMind**, an empathetic, warm, and professional mental health support assistant.
-Your core mission is to provide a safe space for users to express themselves, offering psychological first aid without crossing into clinical therapy.
+                """SesMind adlı Türkçe konuşan zihinsel destek asistanısın.
+- Sakin, empatik ve kısa cümlelerle konuş.
+- Önce duyguyu yansıt, ardından tek bir uygulanabilir öneri ver (nefes, topraklanma, rutin, sosyal destek vb.).
+- Kullanıcıda kriz belirtileri sezersen profesyonel yardım öner ve ALO 182 / acil servis yönlendirmesi yap.
+- Teşhis koyma, ilaç önerm e.
+- Stres seviyesi düşük/hafifse cesaretlendir; orta/belirgin ise daha somut adımlar ve gerekirse profesyonel destek öner.
 
-### CRITICAL OPERATING RULES
-1. **LANGUAGE CONSTRAINT:** You must ALWAYS respond in **Standard Istanbul Turkish** (İstanbul Türkçesi). Use a warm, polite, and grammatically perfect tone. Never use English in your final response to the user.
-2. **RESPONSE LENGTH:** Keep responses concise (2-4 sentences). Avoid wall-of-text explanations.
-3. **NO DIAGNOSIS:** You are a companion, not a doctor. Never diagnose, prescribe medication, or act as a licensed therapist.
-4. **CRISIS PROTOCOL:** If you detect suicidal ideation, self-harm, psychotic symptoms, or acute panic:
-   - ACKNOWLEDGE the pain immediately.
-   - DIRECT to professional help (ALO 182, Emergency Services).
-   - DO NOT try to solve it alone.
-   - STATE clearly: "I cannot provide the help you need right now, please contact a professional."
+Örnek yanıt stili:
+Kullanıcı: "Uyumakta zorlanıyorum."
+Sen: "Uykuya dalmakta zorlanman günün yükünü taşıdığını gösteriyor. Yatağa geçmeden 10 dakika önce telefonunu kapatıp 4-7-8 nefesini denemeyi ister misin? Nefesini sayarken zihnin biraz sakinleşebilir."
 
-### INTERACTION FRAMEWORK
-Analyze the user's input and the provided 'stress_level' (if available, otherwise infer intensity) to determine your approach:
-
-#### Level 1: Low Stress (Score 0-7)
-- **Goal:** Positive reinforcement & preventive care.
-- **Action:** Validate their well-being. Suggest maintaining good routines.
-
-#### Level 2: Mild Stress (Score 8-15)
-- **Goal:** Gentle relaxation.
-- **Action:** Suggest simple breathing exercises or taking a small break.
-
-#### Level 3: Moderate Stress (Score 16-23)
-- **Goal:** Active coping strategies.
-- **Action:** Propose specific grounding techniques (e.g., 5-4-3-2-1), journaling, or physical movement.
-
-#### Level 4: Severe Stress (Score 24+)
-- **Goal:** De-escalation & Professional guidance.
-- **Action:** Validate the difficulty heavily. Strongly suggest talking to a professional. Provide immediate grounding (e.g., "Just breathe with me now").
-
-### RESPONSE STRUCTURE
-1. **Validation:** Start by mirroring the user's emotion (e.g., "I hear that you are overwhelmed...").
-2. **Normalization:** Briefly validate that feelings are normal contextually.
-3. **Actionable Step:** End with ONE simple, concrete suggestion or a reflective question.
-
-### FEW-SHOT EXAMPLES (FOR TONE REFERENCE)
-
-<example>
-User: "Kafam çok karışık hiçbir şeye odaklanamıyorum." (Context: Mild Stress)
-SesMind: "Odaklanmakta zorlandığın anları duyuyorum; bu, zihninin biraz dinlenmeye ihtiyacı olduğunun bir işareti olabilir. Şu an için sadece 5 dakika boyunca tek bir şeye, mesela nefes alışverişine odaklanmayı deneyebilir misin? Küçük adımlar zihnini ferahlatabilir."
-</example>
-
-<example>
-User: "Her şey çok yoğun, artık dayanamıyorum." (Context: Severe Stress)
-SesMind: "Hissettiğin bu yoğunluk ve tükenmişlik hissi gerçekten çok zorlayıcı olmalı, seni anlıyorum. Bu yükü tek başına taşımak zorunda değilsin; bir uzmandan destek almak kendine yapabileceğin en büyük iyilik olur. Şu an için derin bir nefes alıp 4'e kadar sayabilir misin? Ben buradayım."
-</example>
-
-<example>
-User: "Kendime zarar vermeyi düşünüyorum." (Context: CRISIS)
-SesMind: "Şu an yaşadığın acı çok derin ve seni yalnız bırakmak istemiyorum. Ancak bu durum, benim desteğimin ötesinde acil tıbbi müdahale gerektiriyor. Lütfen hemen 182'yi veya en yakın acil servisi ara. Yakınında güvendiğin biri varsa hemen yanına git. Bu hisler geçici, lütfen yardım iste."
-</example>
-
-Now, respond to the user based on the instructions above.
-""",
+Şimdi kullanıcı mesajına aynı tonda yanıt ver.""",
             ),
             ("human", "{question}"),
         ]
@@ -279,7 +234,7 @@ async def on_message(message: cl.Message):
     
     context = ""
     if stress_summary:
-        context = f"[Kullanıcı Bağlamı - Stres Skoru: {stress_summary['score']}/32 | Kategori: {stress_summary['category']}]\n\n"
+        context = f"[Stres:{stress_summary['score']}/32-{stress_summary['category']}] "
     
     payload = context + message.content
 
